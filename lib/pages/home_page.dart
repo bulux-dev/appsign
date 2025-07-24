@@ -28,8 +28,17 @@ class _HomePageState extends State<HomePage> {
 
   void _startListening() async  {
     await _speechToText.listen(onResult: _onSpeechResult);
+    setState(() {
+      _confidenceLevel = 0;
+    });
   }
 
+void _stopListening()async{
+  await _speechToText.stop();
+  setState(() {
+    
+  });
+}
   void _onSpeechResult(result){
     setState(() {
       _wordsSpoken = "${result.recognizedWords}";
@@ -42,12 +51,40 @@ class _HomePageState extends State<HomePage> {
     return Scaffold(appBar: AppBar(
       backgroundColor: Colors.deepPurple,
       title: Text(
-        'Speech Test',
+        'Prueba de grabado',
         style: TextStyle(
           color: Colors.white,
         ),
         )),
-        body: Center(child: Column()),
+        body: Center(child: Column(
+          children: [
+          Container(
+            padding: EdgeInsets.all(16), 
+            child: Text(
+              _speechToText.isListening 
+                ? "Escuchando..." 
+                : _speechEnabled 
+                  ? "Presiona el boton de microfono para escuchar..." 
+                  : "Microfono necesita permiso para escuchar"),
+              ), 
+              if(_speechToText.isNotListening && _confidenceLevel > 0) Text(
+                "Nivel de confianza: ${(_confidenceLevel * 100).toStringAsFixed(1)}%",
+                style: TextStyle(
+                  color: Colors.green,
+                  fontSize: 20,
+                ),
+              ),
+                 
+          ],
+        ),
+        ),
+
+        floatingActionButton: FloatingActionButton(onPressed: _speechToText.isListening ? _stopListening : _startListening,
+        tooltip: 'Escuchar',
+        child: Icon(
+          _speechToText.isNotListening ? Icons.mic_off : Icons.mic,
+          color: Colors.white,  
+        )),
      );
   }
 }
