@@ -9,25 +9,45 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-
   final SpeechToText _speechToText = SpeechToText();
 
   bool _speechEnabled = false;
+  String _wordsSpoken = "";
+  double _confidenceLevel = 0;
 
   @override
-  void initState() {
-    
+  void initState() { 
     super.initState();
+    initSpeech();
   }
+
   void initSpeech() async {
     _speechEnabled = await _speechToText.initialize();
+    setState(() {});
+  }
+
+  void _startListening() async  {
+    await _speechToText.listen(onResult: _onSpeechResult);
+  }
+
+  void _onSpeechResult(result){
     setState(() {
-      
+      _wordsSpoken = "${result.recognizedWords}";
+      _confidenceLevel = result.confidence; 
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold();
+    return Scaffold(appBar: AppBar(
+      backgroundColor: Colors.deepPurple,
+      title: Text(
+        'Speech Test',
+        style: TextStyle(
+          color: Colors.white,
+        ),
+        )),
+        body: Center(child: Column()),
+     );
   }
 }
