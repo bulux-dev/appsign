@@ -67,11 +67,12 @@ void _stopListening()async{
                   ? "Presiona el boton de microfono para escuchar..." 
                   : "Microfono necesita permiso para escuchar"),
               ), 
+              Expanded(child: Container(child: Text(_wordsSpoken),)),
               if(_speechToText.isNotListening && _confidenceLevel > 0) Text(
                 "Nivel de confianza: ${(_confidenceLevel * 100).toStringAsFixed(1)}%",
                 style: TextStyle(
-                  color: Colors.green,
-                  fontSize: 20,
+                  color: Colors.green,  
+                  fontSize: 30,
                 ),
               ),
                  
