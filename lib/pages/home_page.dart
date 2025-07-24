@@ -14,6 +14,7 @@ class _HomePageState extends State<HomePage> {
   bool _speechEnabled = false;
   String _wordsSpoken = "";
   double _confidenceLevel = 0;
+  String _currentLocaleId = '';
 
   @override
   void initState() { 
@@ -21,13 +22,27 @@ class _HomePageState extends State<HomePage> {
     initSpeech();
   }
 
-  void initSpeech() async {
+void initSpeech() async {
     _speechEnabled = await _speechToText.initialize();
+    if (_speechEnabled) {
+      // Obtener la lista de locales disponibles
+      var locales = await _speechToText.locales();
+      // Buscar el locale para español (pueden ser 'es_US', 'es_ES', etc.)
+      // Para este ejemplo, buscamos uno que empiece con 'es'
+      var spanishLocale = locales.firstWhere(
+        (locale) => locale.localeId.startsWith('es'),
+        //orElse: () => locale.localeId.startsWith('en'), // Fallback a inglés si no se encuentra español
+      );
+      _currentLocaleId = spanishLocale.localeId;
+    }
     setState(() {});
   }
 
   void _startListening() async  {
-    await _speechToText.listen(onResult: _onSpeechResult);
+    await _speechToText.listen(
+      onResult: _onSpeechResult,
+      localeId: _currentLocaleId,
+    );
     setState(() {
       _confidenceLevel = 0;
     });
