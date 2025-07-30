@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1746668715",
+    "project_id": "appvideosflutter",
+    "storage_bucket": "appvideosflutter.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1746668715:android:515d286123cc5935503bee",
+        "android_client_info": {
+          "package_name": "com.fluttermapp.appsign"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCX1hDiNOECatY7cblYtdMEBtb6ZaFRI7g"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
