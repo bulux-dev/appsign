@@ -1,7 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:cloud_firestore/cloud_firestore.dart'; // Importar Firestore
-// Eliminadas las importaciones de video_player y chewie
+//import 'package:firebase_storage/firebase_storage.dart'
+
+
+
+
+
+
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -98,7 +104,7 @@ class _HomePageState extends State<HomePage> {
           .get();
 
       setState(() {
-        _foundGifs = querySnapshot.docs.map((doc) => doc.data() as Map<String, dynamic>).toList();
+        _foundGifs = querySnapshot.docs.map((doc) => doc.data()).toList();
         _isLoadingGifs = false;
       });
     } catch (e) {
