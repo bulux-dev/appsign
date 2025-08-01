@@ -1,13 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:speech_to_text/speech_to_text.dart';
-import 'package:cloud_firestore/cloud_firestore.dart'; // Importar Firestore
-//import 'package:firebase_storage/firebase_storage.dart'
-
-
-
-
-
-
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -18,15 +12,15 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   final SpeechToText _speechToText = SpeechToText();
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance; // Instancia de Firestore
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   bool _speechEnabled = false;
   String _wordsSpoken = "";
   double _confidenceLevel = 0;
   String _currentLocaleId = '';
 
-  List<Map<String, dynamic>> _foundGifs = []; // Lista para almacenar GIFs encontrados (cambio de nombre)
-  bool _isLoadingGifs = false; // Estado de carga para los GIFs
+  List<Map<String, dynamic>> _foundGifs = [];
+  bool _isLoadingGifs = false;
 
   @override
   void initState() {
@@ -40,9 +34,9 @@ class _HomePageState extends State<HomePage> {
       var locales = await _speechToText.locales();
       var spanishLocale = locales.firstWhere(
         (locale) => locale.localeId.startsWith('es'),
-        orElse: () => locales.firstWhere( // Fallback a inglés si no hay español
+        orElse: () => locales.firstWhere(
           (locale) => locale.localeId.startsWith('en'),
-          orElse: () => locales.first, // Si no hay ni español ni inglés, usa el primero
+          orElse: () => locales.first,
         ),
       );
       _currentLocaleId = spanishLocale.localeId;
@@ -51,11 +45,10 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _startListening() async {
-    // Limpiar resultados anteriores antes de empezar a escuchar
     setState(() {
       _wordsSpoken = "";
       _confidenceLevel = 0;
-      _foundGifs = []; // Limpiar GIFs encontrados
+      _foundGifs = [];
     });
     await _speechToText.listen(
       onResult: _onSpeechResult,
@@ -66,9 +59,8 @@ class _HomePageState extends State<HomePage> {
   void _stopListening() async {
     await _speechToText.stop();
     setState(() {
-      // Opcional: Iniciar la búsqueda automáticamente al dejar de escuchar
       if (_wordsSpoken.isNotEmpty) {
-        _searchGifs(_wordsSpoken); // Llama a la nueva función de búsqueda de GIFs
+        _searchGifs(_wordsSpoken);
       }
     });
   }
@@ -80,8 +72,8 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
-  // --- FUNCIÓN PARA BUSCAR GIFs EN FIREBASE ---
-  void _searchGifs(String query) async { // Renombrada de _searchVideos a _searchGifs
+  // --- FUNCIÓN PARA BUSCAR GIFs EN FIREBASE (MODIFICADA) ---
+  void _searchGifs(String query) async {
     if (query.isEmpty) {
       setState(() {
         _foundGifs = [];
@@ -90,15 +82,18 @@ class _HomePageState extends State<HomePage> {
     }
 
     setState(() {
-      _isLoadingGifs = true; // Actualiza el estado de carga para GIFs
+      _isLoadingGifs = true;
     });
 
     try {
-      List<String> keywords = query.toLowerCase().split(' ').where((s) => s.isNotEmpty).toList();
+      // Prepara la consulta para buscar coincidencias exactas con el array
+      // En Firestore, el campo 'palabras_clave' debe ser un array de strings,
+      // donde uno de los elementos es exactamente el string de la búsqueda
+      final String searchQuery = query.toLowerCase().trim();
 
       final querySnapshot = await _firestore
-          .collection('gifs') // ¡CAMBIO IMPORTANTE! Asegúrate de que este sea el nombre de tu colección de GIFs
-          .where('palabras_clave', arrayContainsAny: keywords)
+          .collection('gifs')
+          .where('palabras_clave', arrayContains: searchQuery) // <-- CAMBIO CLAVE: Usamos arrayContains
           .orderBy('vistas', descending: true)
           .limit(20)
           .get();
@@ -119,8 +114,8 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  // --- WIDGET PARA MOSTRAR LA LISTA DE GIFs ---
-  Widget _buildGifList() { // Renombrada de _buildVideoList a _buildGifList
+  // --- WIDGET PARA MOSTRAR LA LISTA DE GIFs (MODIFICADO) ---
+  Widget _buildGifList() {
     if (_isLoadingGifs) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -137,42 +132,59 @@ class _HomePageState extends State<HomePage> {
     return ListView.builder(
       itemCount: _foundGifs.length,
       itemBuilder: (context, index) {
-        final gif = _foundGifs[index]; // Renombrada de 'video' a 'gif'
-        return Card(
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          elevation: 4,
-          child: ListTile(
-            leading: gif['url_miniatura'] != null && gif['url_miniatura'].isNotEmpty
-                ? Image.network(
-                    gif['url_miniatura'],
-                    width: 80,
-                    height: 80,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => const Icon(Icons.gif_box, size: 50), // Icono de GIF
-                  )
-                : const Icon(Icons.gif_box, size: 50), // Icono de GIF
-            title: Text(gif['titulo'] ?? 'Sin título'),
-            subtitle: Text(gif['descripcion'] ?? 'Sin descripción'),
-            trailing: Text('${gif['vistas'] ?? 0} vistas'),
-            onTap: () {
-              // Navegar a una página de visualización de GIF
-              if (gif['url_gif'] != null && gif['url_gif'].isNotEmpty) { // ¡CAMBIO IMPORTANTE! Usar 'url_gif'
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => GifViewerPage( // ¡CAMBIO IMPORTANTE! Navegar a GifViewerPage
-                      gifUrl: gif['url_gif'],
-                      title: gif['titulo'] ?? 'GIF', // Pasar el título a la página del GIF
-                    ),
-                  ),
-                );
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('URL del GIF no disponible.')),
-                );
-              }
-            },
-          ),
+        final gif = _foundGifs[index];
+        final String gifPath = gif['url_gif'];
+        final String thumbnailPath = gif['url_miniatura'] ?? '';
+
+        return FutureBuilder<String>(
+          future: thumbnailPath.isNotEmpty ? FirebaseStorage.instance.refFromURL(thumbnailPath).getDownloadURL() : Future.value(''),
+          builder: (BuildContext context, AsyncSnapshot<String> thumbnailSnapshot) {
+            final String thumbnailUrl = thumbnailSnapshot.data ?? '';
+
+            return Card(
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              elevation: 4,
+              child: ListTile(
+                leading: thumbnailUrl.isNotEmpty
+                    ? Image.network(
+                        thumbnailUrl,
+                        width: 80,
+                        height: 80,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => const Icon(Icons.gif_box, size: 50),
+                      )
+                    : const Icon(Icons.gif_box, size: 50),
+                title: Text(gif['titulo'] ?? 'Sin título'),
+                subtitle: Text(gif['descripcion'] ?? 'Sin descripción'),
+                trailing: Text('${gif['vistas'] ?? 0} vistas'),
+                onTap: () async {
+                  if (gifPath.isNotEmpty) {
+                    try {
+                      final String fullGifUrl = await FirebaseStorage.instance.refFromURL(gifPath).getDownloadURL();
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => GifViewerPage(
+                            gifUrl: fullGifUrl,
+                            title: gif['titulo'] ?? 'GIF',
+                          ),
+                        ),
+                      );
+                    } catch (e) {
+                      print("Error al obtener URL del GIF principal: $e");
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('No se pudo cargar el GIF.')),
+                      );
+                    }
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('URL del GIF no disponible.')),
+                    );
+                  }
+                },
+              ),
+            );
+          },
         );
       },
     );
@@ -184,7 +196,7 @@ class _HomePageState extends State<HomePage> {
       appBar: AppBar(
         backgroundColor: Colors.deepPurple,
         title: const Text(
-          'Buscador de GIFs por Voz', // Título actualizado
+          'Buscador de GIFs por Voz',
           style: TextStyle(
             color: Colors.white,
           ),
@@ -230,7 +242,7 @@ class _HomePageState extends State<HomePage> {
                 ],
               ),
             ),
-          Expanded(child: _buildGifList()), // Mostrar la lista de GIFs aquí
+          Expanded(child: _buildGifList()),
         ],
       ),
       floatingActionButton: FloatingActionButton(
@@ -246,10 +258,9 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
-// --- NUEVA PÁGINA PARA VISUALIZAR EL GIF ---
-class GifViewerPage extends StatelessWidget { // Cambiada de StatefulWidget a StatelessWidget (más simple para solo mostrar)
+class GifViewerPage extends StatelessWidget {
   final String gifUrl;
-  final String title; // Campo para mostrar el título del GIF en el AppBar
+  final String title;
 
   const GifViewerPage({super.key, required this.gifUrl, required this.title});
 
@@ -257,7 +268,7 @@ class GifViewerPage extends StatelessWidget { // Cambiada de StatefulWidget a St
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(title), // Muestra el título del GIF
+        title: Text(title),
         backgroundColor: Colors.deepPurple,
         iconTheme: const IconThemeData(color: Colors.white),
         titleTextStyle: const TextStyle(color: Colors.white, fontSize: 20),
@@ -265,7 +276,7 @@ class GifViewerPage extends StatelessWidget { // Cambiada de StatefulWidget a St
       body: Center(
         child: Image.network(
           gifUrl,
-          fit: BoxFit.contain, // Ajusta cómo el GIF se muestra dentro de su espacio
+          fit: BoxFit.contain,
           loadingBuilder: (BuildContext context, Widget child, ImageChunkEvent? loadingProgress) {
             if (loadingProgress == null) {
               return child;
