@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -213,6 +214,15 @@ Widget _buildGifList() {
             color: Colors.white,
           ),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout,color: Colors.white),
+            onPressed:() async{
+              await FirebaseAuth.instance.signOut();
+            },
+            tooltip: 'Cerrar Sesion',
+          ),
+        ]
       ),
       body: Column(
         children: [
