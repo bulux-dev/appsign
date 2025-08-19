@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart'; // <--- Nueva importación para el sign out
 
 class AdminPage extends StatefulWidget {
   const AdminPage({super.key});
@@ -22,6 +23,11 @@ class _AdminPageState extends State<AdminPage> {
   final ImagePicker _picker = ImagePicker();
 
   bool _isLoading = false;
+
+  // Nuevo método para cerrar la sesión del usuario
+  void _signOut() async {
+    await FirebaseAuth.instance.signOut();
+  }
 
   Future<void> _pickImage(bool isGif) async {
     final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
@@ -123,6 +129,13 @@ class _AdminPageState extends State<AdminPage> {
         title: const Text('Panel de Administración', style: TextStyle(color: Colors.white)),
         backgroundColor: Colors.deepPurple,
         iconTheme: const IconThemeData(color: Colors.white),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: _signOut, // <--- Llama a la función de cerrar sesión
+            tooltip: 'Cerrar Sesión',
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
