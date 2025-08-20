@@ -18,45 +18,50 @@ class _AdminPageState extends State<AdminPage> {
   final _descriptionController = TextEditingController();
   final _keywordsController = TextEditingController();
 
-  File? _gifFile;
+  File? _mediaFile;
   File? _thumbnailFile;
   final ImagePicker _picker = ImagePicker();
 
   bool _isLoading = false;
+  String _mediaType = ''; // 'mp4', 'gif', 'jpg', etc.
 
   void _signOut() async {
     await FirebaseAuth.instance.signOut();
   }
 
-  // Se actualizó este método para validar el tipo de archivo
-  Future<void> _pickImage(bool isGif) async {
+  // Se actualizó este método para aceptar cualquier archivo
+  Future<void> _pickFile(bool isMedia) async {
     final XFile? pickedFile = await _picker.pickMedia();
     if (pickedFile != null) {
-      // Obtener la extensión del archivo para validarlo
       final String fileExtension = pickedFile.path.split('.').last.toLowerCase();
       
-      setState(() {
-        if (isGif) {
-          if (fileExtension == 'gif') {
-            _gifFile = File(pickedFile.path);
-          } else {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Por favor, selecciona un archivo GIF.')),
-            );
-            _gifFile = null;
-          }
+      if (isMedia) {
+        // Validar tipos de archivos multimedia
+        if (['mp4', 'gif', 'mov', 'webp', 'png', 'jpg', 'jpeg'].contains(fileExtension)) {
+          setState(() {
+            _mediaFile = File(pickedFile.path);
+            _mediaType = fileExtension;
+          });
         } else {
-          // Aceptar imágenes para la miniatura, no solo GIFs
-          if (fileExtension == 'jpg' || fileExtension == 'jpeg' || fileExtension == 'png' || fileExtension == 'gif') {
-            _thumbnailFile = File(pickedFile.path);
-          } else {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Por favor, selecciona una imagen para la miniatura (JPG, PNG o GIF).')),
-            );
-            _thumbnailFile = null;
-          }
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Por favor, selecciona un archivo de video o imagen (mp4, gif, mov, webp, png, jpg, jpeg).')),
+          );
+          _mediaFile = null;
+          _mediaType = '';
         }
-      });
+      } else {
+        // Validar tipos de archivos para la miniatura
+        if (['jpg', 'jpeg', 'png', 'gif'].contains(fileExtension)) {
+          setState(() {
+            _thumbnailFile = File(pickedFile.path);
+          });
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Por favor, selecciona una imagen para la miniatura (JPG, PNG o GIF).')),
+          );
+          _thumbnailFile = null;
+        }
+      }
     }
   }
 
@@ -67,12 +72,12 @@ class _AdminPageState extends State<AdminPage> {
     return await snapshot.ref.getDownloadURL();
   }
 
-  void _uploadGif() async {
+  void _uploadContent() async {
     if (_titleController.text.isEmpty ||
-        _gifFile == null ||
+        _mediaFile == null ||
         _thumbnailFile == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Por favor, completa todos los campos y selecciona las imágenes.')),
+        const SnackBar(content: Text('Por favor, completa todos los campos y selecciona los archivos.')),
       );
       return;
     }
@@ -82,10 +87,10 @@ class _AdminPageState extends State<AdminPage> {
     });
 
     try {
-      final String gifPath = 'gifs/${DateTime.now().millisecondsSinceEpoch}_${_gifFile!.path.split('/').last}';
+      final String mediaPath = 'content/${DateTime.now().millisecondsSinceEpoch}_${_mediaFile!.path.split('/').last}';
       final String thumbnailPath = 'thumbnails/${DateTime.now().millisecondsSinceEpoch}_${_thumbnailFile!.path.split('/').last}';
 
-      final String gifUrl = await _uploadFile(_gifFile!, gifPath);
+      final String mediaUrl = await _uploadFile(_mediaFile!, mediaPath);
       final String thumbnailUrl = await _uploadFile(_thumbnailFile!, thumbnailPath);
 
       final List<String> keywords = _keywordsController.text
@@ -95,12 +100,13 @@ class _AdminPageState extends State<AdminPage> {
           .where((s) => s.isNotEmpty)
           .toList();
 
-      await FirebaseFirestore.instance.collection('gifs').add({
+      await FirebaseFirestore.instance.collection('content').add({
         'titulo': _titleController.text.trim(),
         'descripcion': _descriptionController.text.trim(),
         'palabras_clave': keywords,
-        'url_gif': gifUrl,
+        'url_media': mediaUrl,
         'url_miniatura': thumbnailUrl,
+        'tipo': _mediaType,
         'vistas': 0,
         'timestamp': FieldValue.serverTimestamp(),
       });
@@ -109,21 +115,21 @@ class _AdminPageState extends State<AdminPage> {
       _descriptionController.clear();
       _keywordsController.clear();
       setState(() {
-        _gifFile = null;
+        _mediaFile = null;
         _thumbnailFile = null;
         _isLoading = false;
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('GIF subido exitosamente.')),
+        const SnackBar(content: Text('Contenido subido exitosamente.')),
       );
     } catch (e) {
-      print('Error al subir el GIF: $e');
+      print('Error al subir el contenido: $e');
       setState(() {
         _isLoading = false;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Ocurrió un error al subir el GIF. Intenta de nuevo.')),
+        const SnackBar(content: Text('Ocurrió un error al subir el contenido. Intenta de nuevo.')),
       );
     }
   }
@@ -158,7 +164,7 @@ class _AdminPageState extends State<AdminPage> {
           children: [
             TextField(
               controller: _titleController,
-              decoration: const InputDecoration(labelText: 'Título del GIF'),
+              decoration: const InputDecoration(labelText: 'Título'),
             ),
             const SizedBox(height: 16),
             TextField(
@@ -175,27 +181,33 @@ class _AdminPageState extends State<AdminPage> {
               children: [
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: () => _pickImage(true),
-                    child: const Text('Seleccionar GIF'),
+                    onPressed: () => _pickFile(true),
+                    child: const Text('Seleccionar Archivo Multimedia'),
                   ),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: () => _pickImage(false),
+                    onPressed: () => _pickFile(false),
                     child: const Text('Seleccionar Miniatura'),
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 16),
-            if (_gifFile != null)
-              Image.file(_gifFile!, height: 150),
+            if (_mediaFile != null)
+              Image.file(
+                _mediaFile!,
+                height: 150,
+                // Si el archivo es un video, no se muestra una vista previa aquí.
+                // Si es una imagen o GIF, se muestra la vista previa.
+                errorBuilder: (context, error, stackTrace) => const Text('Vista previa no disponible para este tipo de archivo.'),
+              ),
             if (_thumbnailFile != null)
               Image.file(_thumbnailFile!, height: 100),
             const SizedBox(height: 24),
             ElevatedButton(
-              onPressed: _isLoading ? null : _uploadGif,
+              onPressed: _isLoading ? null : _uploadContent,
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.deepPurple,
                 foregroundColor: Colors.white,
@@ -203,7 +215,7 @@ class _AdminPageState extends State<AdminPage> {
               ),
               child: _isLoading
                   ? const CircularProgressIndicator(color: Colors.white)
-                  : const Text('Subir GIF', style: TextStyle(fontSize: 18)),
+                  : const Text('Subir Contenido', style: TextStyle(fontSize: 18)),
             ),
           ],
         ),

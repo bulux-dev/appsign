@@ -2,7 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cached_network_image/cached_network_image.dart'; // Asegúrate de tener este paquete
+import 'package:cached_network_image/cached_network_image.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -87,15 +87,33 @@ class _HomePageState extends State<HomePage> {
     });
 
     try {
-      final List<String> searchTerms = query.toLowerCase().trim().split(' ');
+      final String searchQuery = query.toLowerCase().trim();
 
-      // Ahora buscamos en la colección 'content'
+      // Buscamos en la colección 'content'
       final querySnapshot = await _firestore
           .collection('content')
-          .where('palabras_clave', arrayContainsAny: searchTerms)
           .get();
 
-      List<Map<String, dynamic>> results = querySnapshot.docs.map((doc) => doc.data() as Map<String, dynamic>).toList();
+      List<Map<String, dynamic>> allContent = querySnapshot.docs.map((doc) => doc.data()).toList();
+
+      // Filtramos los resultados localmente para encontrar coincidencias en los campos
+      final results = allContent.where((content) {
+        final title = content['titulo']?.toLowerCase() ?? '';
+        final description = content['descripcion']?.toLowerCase() ?? '';
+        final keywords = (content['palabras_clave'] as List<dynamic>?)?.map((k) => k.toString().toLowerCase()).toList() ?? [];
+
+        // Ahora comprobamos si CUALQUIER palabra de la búsqueda está contenida en el título, descripción o palabras clave
+        final searchTerms = searchQuery.split(' ');
+        
+        return searchTerms.any((term) {
+          final trimmedTerm = term.trim();
+          if (trimmedTerm.isEmpty) return false;
+
+          return title.contains(trimmedTerm) ||
+                 description.contains(trimmedTerm) ||
+                 keywords.any((keyword) => keyword.contains(trimmedTerm));
+        });
+      }).toList();
       
       setState(() {
         _foundContent = results;
@@ -136,9 +154,9 @@ class _HomePageState extends State<HomePage> {
       itemCount: _foundContent.length,
       itemBuilder: (context, index) {
         final content = _foundContent[index];
-        final String mediaUrl = content['url_media'] ?? '';
         final String thumbnailUrl = content['url_miniatura'] ?? '';
-        final String mediaType = content['tipo'] ?? 'gif'; // Valor por defecto 'gif'
+        // Asignamos el tipo de archivo dinámicamente desde Firestore
+        final String mediaType = content['tipo'] ?? '';
         
         return Card(
           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -155,6 +173,7 @@ class _HomePageState extends State<HomePage> {
                   placeholder: (context, url) => const CircularProgressIndicator(),
                   errorWidget: (context, url, error) => const Icon(Icons.error),
                 ),
+                // Mostramos el icono de reproducción solo si es un video MP4
                 if (mediaType == 'mp4')
                   const Icon(Icons.play_circle_fill, size: 40, color: Colors.white70),
               ],
@@ -163,8 +182,6 @@ class _HomePageState extends State<HomePage> {
             subtitle: Text(content['descripcion'] ?? 'Sin descripción'),
             trailing: Text('${content['vistas'] ?? 0} vistas'),
             onTap: () {
-              // Aquí podrías implementar la navegación a una página de visualización
-              // de video o GIF, pero por ahora solo es un mensaje.
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(content: Text('Tocado: ${content['titulo']}')),
               );

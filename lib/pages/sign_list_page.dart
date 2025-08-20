@@ -2,24 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:cached_network_image/cached_network_image.dart'; 
-import 'package:appsign/pages/edit_sign_page.dart'; // Importa la nueva página de edición
+import 'package:appsign/pages/edit_sign_page.dart';
 
 class SignListPage extends StatelessWidget {
   const SignListPage({super.key});
 
-  // Método para eliminar un GIF y su miniatura de Firebase Storage y Firestore
   Future<void> _deleteSign(String docId, String mediaUrl, String thumbnailUrl) async {
     try {
       await FirebaseFirestore.instance.collection('content').doc(docId).delete();
       await FirebaseStorage.instance.refFromURL(mediaUrl).delete();
       await FirebaseStorage.instance.refFromURL(thumbnailUrl).delete();
-      
     } catch (e) {
       print('Error al eliminar la seña: $e');
     }
   }
   
-  // Método para mostrar un modal de confirmación antes de eliminar
   void _showDeleteConfirmationDialog(BuildContext context, String docId, String mediaUrl, String thumbnailUrl) {
     showDialog(
       context: context,
@@ -55,7 +52,7 @@ class SignListPage extends StatelessWidget {
         iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance.collection('content').snapshots(), // Colección 'content'
+        stream: FirebaseFirestore.instance.collection('content').snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -77,10 +74,11 @@ class SignListPage extends StatelessWidget {
               final signDoc = signs[index];
               final signData = signDoc.data() as Map<String, dynamic>;
               
+              // Se obtienen los datos de forma segura para evitar errores de tipo nulo
               final String docId = signDoc.id;
               final String title = signData['titulo'] ?? 'Sin título';
               final String thumbnailUrl = signData['url_miniatura'] ?? '';
-              final String mediaUrl = signData['url_media'] ?? ''; // URL del video/GIF
+              final String mediaUrl = signData['url_media'] ?? '';
 
               return Card(
                 elevation: 4,
@@ -89,23 +87,23 @@ class SignListPage extends StatelessWidget {
                   leading: SizedBox(
                     width: 80,
                     height: 80,
-                    child: CachedNetworkImage(
-                      imageUrl: thumbnailUrl,
-                      fit: BoxFit.cover,
-                      placeholder: (context, url) => const CircularProgressIndicator(),
-                      errorWidget: (context, url, error) => const Icon(Icons.error),
-                    ),
+                    child: thumbnailUrl.isNotEmpty
+                      ? CachedNetworkImage(
+                          imageUrl: thumbnailUrl,
+                          fit: BoxFit.cover,
+                          placeholder: (context, url) => const Center(child: CircularProgressIndicator()),
+                          errorWidget: (context, url, error) => const Icon(Icons.error, color: Colors.red),
+                        )
+                      : const Icon(Icons.image, size: 80, color: Colors.grey),
                   ),
                   title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
                   subtitle: Text('ID del documento: $docId'),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // Botón para editar
                       IconButton(
                         icon: const Icon(Icons.edit, color: Colors.blue),
                         onPressed: () {
-                          // Navega a la página de edición con los datos del documento
                           Navigator.of(context).push(
                             MaterialPageRoute(
                               builder: (context) => EditSignPage(
@@ -116,7 +114,6 @@ class SignListPage extends StatelessWidget {
                           );
                         },
                       ),
-                      // Botón para eliminar
                       IconButton(
                         icon: const Icon(Icons.delete, color: Colors.red),
                         onPressed: () => _showDeleteConfirmationDialog(context, docId, mediaUrl, thumbnailUrl),
