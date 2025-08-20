@@ -58,12 +58,9 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _stopListening() async {
+    // Se comenta la lógica aquí para evitar conflictos.
+    // La búsqueda ahora se activa en _onSpeechResult cuando se tiene el resultado final.
     await _speechToText.stop();
-    setState(() {
-      if (_wordsSpoken.isNotEmpty) {
-        _searchContent(_wordsSpoken);
-      }
-    });
   }
 
   void _onSpeechResult(result) {
@@ -71,6 +68,16 @@ class _HomePageState extends State<HomePage> {
       _wordsSpoken = result.recognizedWords;
       _confidenceLevel = result.confidence;
     });
+
+    // P-1: Agregado para depuración: Confirma la palabra reconocida.
+    print('Palabra reconocida: $_wordsSpoken');
+
+    // Aquí está el cambio clave: si el resultado es final,
+    // detenemos el micrófono y activamos la búsqueda.
+    if (result.finalResult) {
+      _speechToText.stop();
+      _searchContent(result.recognizedWords);
+    }
   }
 
   // --- FUNCIÓN PARA BUSCAR CONTENIDO EN FIREBASE ---
@@ -89,20 +96,26 @@ class _HomePageState extends State<HomePage> {
     try {
       final String searchQuery = query.toLowerCase().trim();
 
-      // Buscamos en la colección 'content'
+      // P-2: Agregado para depuración: Ver la consulta que se usa para la búsqueda.
+      print('Buscando con la consulta: $searchQuery');
+
       final querySnapshot = await _firestore
           .collection('content')
           .get();
 
-      List<Map<String, dynamic>> allContent = querySnapshot.docs.map((doc) => doc.data()).toList();
+      List<Map<String, dynamic>> allContent = querySnapshot.docs.map((doc) => doc.data() as Map<String, dynamic>).toList();
 
-      // Filtramos los resultados localmente para encontrar coincidencias en los campos
+      // P-3: Agregado para depuración: Ver todos los datos que se obtienen de Firestore.
+      print('Datos obtenidos de Firestore: ${allContent.length} documentos');
+      for (var doc in allContent) {
+        print(doc);
+      }
+
       final results = allContent.where((content) {
         final title = content['titulo']?.toLowerCase() ?? '';
         final description = content['descripcion']?.toLowerCase() ?? '';
         final keywords = (content['palabras_clave'] as List<dynamic>?)?.map((k) => k.toString().toLowerCase()).toList() ?? [];
 
-        // Ahora comprobamos si CUALQUIER palabra de la búsqueda está contenida en el título, descripción o palabras clave
         final searchTerms = searchQuery.split(' ');
         
         return searchTerms.any((term) {
@@ -119,6 +132,12 @@ class _HomePageState extends State<HomePage> {
         _foundContent = results;
         _isLoadingContent = false;
       });
+
+    // P-4: Agregado para depuración: Ver los resultados después del filtro.
+    print('Resultados encontrados después del filtro: ${_foundContent.length}');
+    for (var doc in _foundContent) {
+      print(doc);
+    }
 
     } catch (e) {
       print("Error buscando contenido: $e");
@@ -154,8 +173,8 @@ class _HomePageState extends State<HomePage> {
       itemCount: _foundContent.length,
       itemBuilder: (context, index) {
         final content = _foundContent[index];
+        final String mediaUrl = content['url_media'] ?? '';
         final String thumbnailUrl = content['url_miniatura'] ?? '';
-        // Asignamos el tipo de archivo dinámicamente desde Firestore
         final String mediaType = content['tipo'] ?? '';
         
         return Card(
@@ -173,7 +192,6 @@ class _HomePageState extends State<HomePage> {
                   placeholder: (context, url) => const CircularProgressIndicator(),
                   errorWidget: (context, url, error) => const Icon(Icons.error),
                 ),
-                // Mostramos el icono de reproducción solo si es un video MP4
                 if (mediaType == 'mp4')
                   const Icon(Icons.play_circle_fill, size: 40, color: Colors.white70),
               ],
