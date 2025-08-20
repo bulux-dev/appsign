@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart'; // <--- Nueva importación para el sign out
+import 'package:firebase_auth/firebase_auth.dart';
 
 class AdminPage extends StatefulWidget {
   const AdminPage({super.key});
@@ -24,19 +24,37 @@ class _AdminPageState extends State<AdminPage> {
 
   bool _isLoading = false;
 
-  // Nuevo método para cerrar la sesión del usuario
   void _signOut() async {
     await FirebaseAuth.instance.signOut();
   }
 
+  // Se actualizó este método para validar el tipo de archivo
   Future<void> _pickImage(bool isGif) async {
-    final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
+    final XFile? pickedFile = await _picker.pickMedia();
     if (pickedFile != null) {
+      // Obtener la extensión del archivo para validarlo
+      final String fileExtension = pickedFile.path.split('.').last.toLowerCase();
+      
       setState(() {
         if (isGif) {
-          _gifFile = File(pickedFile.path);
+          if (fileExtension == 'gif') {
+            _gifFile = File(pickedFile.path);
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Por favor, selecciona un archivo GIF.')),
+            );
+            _gifFile = null;
+          }
         } else {
-          _thumbnailFile = File(pickedFile.path);
+          // Aceptar imágenes para la miniatura, no solo GIFs
+          if (fileExtension == 'jpg' || fileExtension == 'jpeg' || fileExtension == 'png' || fileExtension == 'gif') {
+            _thumbnailFile = File(pickedFile.path);
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Por favor, selecciona una imagen para la miniatura (JPG, PNG o GIF).')),
+            );
+            _thumbnailFile = null;
+          }
         }
       });
     }
@@ -67,11 +85,9 @@ class _AdminPageState extends State<AdminPage> {
       final String gifPath = 'gifs/${DateTime.now().millisecondsSinceEpoch}_${_gifFile!.path.split('/').last}';
       final String thumbnailPath = 'thumbnails/${DateTime.now().millisecondsSinceEpoch}_${_thumbnailFile!.path.split('/').last}';
 
-      // Subir las imágenes a Firebase Storage
       final String gifUrl = await _uploadFile(_gifFile!, gifPath);
       final String thumbnailUrl = await _uploadFile(_thumbnailFile!, thumbnailPath);
 
-      // Limpiar y preparar las palabras clave para Firestore
       final List<String> keywords = _keywordsController.text
           .toLowerCase()
           .split(',')
@@ -79,18 +95,16 @@ class _AdminPageState extends State<AdminPage> {
           .where((s) => s.isNotEmpty)
           .toList();
 
-      // Guardar el documento en Firestore
       await FirebaseFirestore.instance.collection('gifs').add({
         'titulo': _titleController.text.trim(),
         'descripcion': _descriptionController.text.trim(),
         'palabras_clave': keywords,
-        'url_gif': gifUrl, // URL para el GIF original
-        'url_miniatura': thumbnailUrl, // URL para la miniatura
-        'vistas': 0, // Un contador de vistas
+        'url_gif': gifUrl,
+        'url_miniatura': thumbnailUrl,
+        'vistas': 0,
         'timestamp': FieldValue.serverTimestamp(),
       });
 
-      // Limpiar los campos después de la subida
       _titleController.clear();
       _descriptionController.clear();
       _keywordsController.clear();
@@ -132,7 +146,7 @@ class _AdminPageState extends State<AdminPage> {
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
-            onPressed: _signOut, // <--- Llama a la función de cerrar sesión
+            onPressed: _signOut,
             tooltip: 'Cerrar Sesión',
           ),
         ],

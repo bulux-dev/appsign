@@ -2,7 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_storage/firebase_storage.dart';
+import 'package:cached_network_image/cached_network_image.dart'; // Asegúrate de tener este paquete
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -20,8 +20,8 @@ class _HomePageState extends State<HomePage> {
   double _confidenceLevel = 0;
   String _currentLocaleId = '';
 
-  List<Map<String, dynamic>> _foundGifs = [];
-  bool _isLoadingGifs = false;
+  List<Map<String, dynamic>> _foundContent = [];
+  bool _isLoadingContent = false;
 
   @override
   void initState() {
@@ -49,7 +49,7 @@ class _HomePageState extends State<HomePage> {
     setState(() {
       _wordsSpoken = "";
       _confidenceLevel = 0;
-      _foundGifs = [];
+      _foundContent = [];
     });
     await _speechToText.listen(
       onResult: _onSpeechResult,
@@ -61,7 +61,7 @@ class _HomePageState extends State<HomePage> {
     await _speechToText.stop();
     setState(() {
       if (_wordsSpoken.isNotEmpty) {
-        _searchGifs(_wordsSpoken);
+        _searchContent(_wordsSpoken);
       }
     });
   }
@@ -73,143 +73,115 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
-  // --- FUNCIÓN PARA BUSCAR GIFs EN FIREBASE (MODIFICADA) ---
- void _searchGifs(String query) async {
-  // Limpia la búsqueda si el query es vacío
-  if (query.isEmpty) {
+  // --- FUNCIÓN PARA BUSCAR CONTENIDO EN FIREBASE ---
+  void _searchContent(String query) async {
+    if (query.isEmpty) {
+      setState(() {
+        _foundContent = [];
+      });
+      return;
+    }
+
     setState(() {
-      _foundGifs = [];
+      _isLoadingContent = true;
     });
-    return;
+
+    try {
+      final List<String> searchTerms = query.toLowerCase().trim().split(' ');
+
+      // Ahora buscamos en la colección 'content'
+      final querySnapshot = await _firestore
+          .collection('content')
+          .where('palabras_clave', arrayContainsAny: searchTerms)
+          .get();
+
+      List<Map<String, dynamic>> results = querySnapshot.docs.map((doc) => doc.data() as Map<String, dynamic>).toList();
+      
+      setState(() {
+        _foundContent = results;
+        _isLoadingContent = false;
+      });
+
+    } catch (e) {
+      print("Error buscando contenido: $e");
+      setState(() {
+        _isLoadingContent = false;
+        _foundContent = [];
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Error al buscar contenido. Intenta de nuevo.')),
+      );
+    }
   }
 
-  setState(() {
-    _isLoadingGifs = true;
-  });
-
-  try {
-    // 1. Limpiamos y dividimos la consulta en palabras individuales
-    final List<String> searchTerms = query.toLowerCase().trim().split(' ');
-
-    // 2. Preparamos una consulta que busca documentos que contienen CUALQUIERA
-    // de las palabras clave de la búsqueda en su array 'palabras_clave'
-    final querySnapshot = await _firestore
-        .collection('gifs')
-        .where('palabras_clave', arrayContainsAny: searchTerms) // <-- CAMBIO CLAVE: Usa 'arrayContainsAny'
-        .get();
-
-    // 3. Opcional: Filtramos los resultados en el cliente para mayor relevancia
-    // Esto es útil si quieres ordenar por la cantidad de coincidencias
-    List<Map<String, dynamic>> results = querySnapshot.docs.map((doc) => doc.data()).toList();
+  // --- WIDGET PARA MOSTRAR LA LISTA DE CONTENIDO ---
+  Widget _buildContentList() {
+    if (_isLoadingContent) {
+      return const Center(child: CircularProgressIndicator());
+    }
     
-    // Aquí podrías implementar una lógica más compleja para ordenar si lo necesitas.
+    if (_foundContent.isEmpty && _wordsSpoken.isNotEmpty && !_speechToText.isListening) {
+      return const Center(child: Text("No se encontró contenido para tu búsqueda."));
+    }
+    
+    if (_foundContent.isEmpty && _wordsSpoken.isEmpty && !_speechToText.isListening && _speechEnabled) {
+      return const Center(child: Text("Presiona el micrófono y di algo para buscar señas."));
+    }
+    
+    if (!_speechEnabled) {
+      return const Center(child: Text("El micrófono no está habilitado."));
+    }
 
-    setState(() {
-      _foundGifs = results;
-      _isLoadingGifs = false;
-    });
-
-  } catch (e) {
-    print("Error buscando GIFs: $e");
-    setState(() {
-      _isLoadingGifs = false;
-      _foundGifs = [];
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Error al buscar GIFs. Intenta de nuevo.')),
+    return ListView.builder(
+      itemCount: _foundContent.length,
+      itemBuilder: (context, index) {
+        final content = _foundContent[index];
+        final String mediaUrl = content['url_media'] ?? '';
+        final String thumbnailUrl = content['url_miniatura'] ?? '';
+        final String mediaType = content['tipo'] ?? 'gif'; // Valor por defecto 'gif'
+        
+        return Card(
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          elevation: 4,
+          child: ListTile(
+            leading: Stack(
+              alignment: Alignment.center,
+              children: [
+                CachedNetworkImage(
+                  imageUrl: thumbnailUrl,
+                  width: 80,
+                  height: 80,
+                  fit: BoxFit.cover,
+                  placeholder: (context, url) => const CircularProgressIndicator(),
+                  errorWidget: (context, url, error) => const Icon(Icons.error),
+                ),
+                if (mediaType == 'mp4')
+                  const Icon(Icons.play_circle_fill, size: 40, color: Colors.white70),
+              ],
+            ),
+            title: Text(content['titulo'] ?? 'Sin título'),
+            subtitle: Text(content['descripcion'] ?? 'Sin descripción'),
+            trailing: Text('${content['vistas'] ?? 0} vistas'),
+            onTap: () {
+              // Aquí podrías implementar la navegación a una página de visualización
+              // de video o GIF, pero por ahora solo es un mensaje.
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Tocado: ${content['titulo']}')),
+              );
+            },
+          ),
+        );
+      },
     );
   }
-}
-  // --- WIDGET PARA MOSTRAR LA LISTA DE GIFs (MODIFICADO) ---
-Widget _buildGifList() {
-  if (_isLoadingGifs) {
-    return const Center(child: CircularProgressIndicator());
-  }
-  
-  // Mensaje para cuando no se encuentran resultados
-  if (_foundGifs.isEmpty && _wordsSpoken.isNotEmpty && !_speechToText.isListening) {
-    return const Center(child: Text("No se encontraron GIFs para tu búsqueda."));
-  }
-  
-  // Mensaje para cuando la aplicación está esperando la búsqueda
-  if (_foundGifs.isEmpty && _wordsSpoken.isEmpty && !_speechToText.isListening && _speechEnabled) {
-    return const Center(child: Text("Presiona el micrófono y di algo para buscar GIFs."));
-  }
-  
-  // Mensaje si el micrófono no está habilitado
-  if (!_speechEnabled) {
-    return const Center(child: Text("El micrófono no está habilitado."));
-  }
 
-  return ListView.builder(
-    itemCount: _foundGifs.length,
-    itemBuilder: (context, index) {
-      final gif = _foundGifs[index];
-      final String gifPath = gif['url_gif'] ?? ''; // <-- Verificación de nulos
-      final String thumbnailPath = gif['url_miniatura'] ?? '';
-
-      return FutureBuilder<String>(
-        future: thumbnailPath.isNotEmpty
-            ? FirebaseStorage.instance.refFromURL(thumbnailPath).getDownloadURL()
-            : Future.value(''),
-        builder: (BuildContext context, AsyncSnapshot<String> thumbnailSnapshot) {
-          final String thumbnailUrl = thumbnailSnapshot.data ?? '';
-
-          return Card(
-            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            elevation: 4,
-            child: ListTile(
-              leading: thumbnailUrl.isNotEmpty
-                  ? Image.network(
-                      thumbnailUrl,
-                      width: 80,
-                      height: 80,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => const Icon(Icons.gif_box, size: 50),
-                    )
-                  : const Icon(Icons.gif_box, size: 50),
-              title: Text(gif['titulo'] ?? 'Sin título'),
-              subtitle: Text(gif['descripcion'] ?? 'Sin descripción'),
-              trailing: Text('${gif['vistas'] ?? 0} vistas'),
-              onTap: () async {
-                if (gifPath.isNotEmpty) {
-                  try {
-                    final String fullGifUrl = await FirebaseStorage.instance.refFromURL(gifPath).getDownloadURL();
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => GifViewerPage(
-                          gifUrl: fullGifUrl,
-                          title: gif['titulo'] ?? 'GIF',
-                        ),
-                      ),
-                    );
-                  } catch (e) {
-                    print("Error al obtener URL del GIF principal: $e");
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('No se pudo cargar el GIF.')),
-                    );
-                  }
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('URL del GIF no disponible.')),
-                  );
-                }
-              },
-            ),
-          );
-        },
-      );
-    },
-  );
-}
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.deepPurple,
         title: const Text(
-          'Buscador de GIFs por Voz',
+          'Buscador de Señas por Voz',
           style: TextStyle(
             color: Colors.white,
           ),
@@ -264,7 +236,7 @@ Widget _buildGifList() {
                 ],
               ),
             ),
-          Expanded(child: _buildGifList()),
+          Expanded(child: _buildContentList()),
         ],
       ),
       floatingActionButton: FloatingActionButton(
@@ -274,46 +246,6 @@ Widget _buildGifList() {
         child: Icon(
           _speechToText.isNotListening ? Icons.mic_none : Icons.mic,
           color: Colors.white,
-        ),
-      ),
-    );
-  }
-}
-
-class GifViewerPage extends StatelessWidget {
-  final String gifUrl;
-  final String title;
-
-  const GifViewerPage({super.key, required this.gifUrl, required this.title});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(title),
-        backgroundColor: Colors.deepPurple,
-        iconTheme: const IconThemeData(color: Colors.white),
-        titleTextStyle: const TextStyle(color: Colors.white, fontSize: 20),
-      ),
-      body: Center(
-        child: Image.network(
-          gifUrl,
-          fit: BoxFit.contain,
-          loadingBuilder: (BuildContext context, Widget child, ImageChunkEvent? loadingProgress) {
-            if (loadingProgress == null) {
-              return child;
-            }
-            return Center(
-              child: CircularProgressIndicator(
-                value: loadingProgress.expectedTotalBytes != null
-                    ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
-                    : null,
-              ),
-            );
-          },
-          errorBuilder: (context, error, stackTrace) {
-            return const Text('No se pudo cargar el GIF');
-          },
         ),
       ),
     );
