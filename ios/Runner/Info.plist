@@ -32,6 +32,8 @@
     <string>Appsign needs access to speech recognition to provide voice commands.</string>
     <key>NSMicrophoneUsageDescription</key>
     <string>Appsign needs access to the microphone to capture audio for voice commands.</string>
+    <key>NSCameraUsageDescription</key>
+    <string>Esta aplicación necesita acceso a la cámara para el reconocimiento de señas.</string>
     
     <key>NSPhotoLibraryUsageDescription</key>
     <string>This app needs access to your photo gallery to upload GIFs and thumbnails.</string>

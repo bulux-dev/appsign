@@ -1,3 +1,4 @@
+import 'package:appsign/pages/sign_detection_module.dart';
 import 'package:appsign/pages/text_search_page.dart';
 import 'package:flutter/material.dart';
 import 'package:appsign/pages/home_page.dart';
@@ -50,12 +51,9 @@ class MenuPage extends StatelessWidget {
             const SizedBox(height: 30),
             ElevatedButton.icon(
               onPressed: () {
-                // Navegar a la futura página de "Señas"
-                // Navigator.of(context).push(
-                //   MaterialPageRoute(builder: (context) => const SignLanguagePage()),
-                // );
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('La página de señas aún no está disponible.')),
+                // Navegar a la página de "Señas"
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (context) => const SignDetectionModule()),
                 );
               },
               icon: const Icon(Icons.sign_language, size: 50),
@@ -69,8 +67,6 @@ class MenuPage extends StatelessWidget {
                 ),
               ),
             ),
-
-
 
 
             const SizedBox(height: 30),
@@ -93,9 +89,6 @@ class MenuPage extends StatelessWidget {
                 ),
               ),
               ),
-
-
-              
           ],
         ),
       ),

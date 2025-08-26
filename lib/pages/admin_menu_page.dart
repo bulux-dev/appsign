@@ -1,3 +1,4 @@
+import 'package:appsign/pages/sign_detection_module.dart';
 import 'package:appsign/pages/text_search_page.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -52,25 +53,25 @@ class AdminMenuPage extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 30),
-              
-              // Botón para la sección de Señas (futura implementación)
-              ElevatedButton.icon(
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('La página de señas aún no está disponible.')),
-                  );
-                },
-                icon: const Icon(Icons.sign_language, size: 50),
-                label: const Text('Señas', style: TextStyle(fontSize: 24)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.deepPurple,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+            ElevatedButton.icon(
+              onPressed: () {
+                // Navegar a la página de "Señas"
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (context) => const SignDetectionModule()),
+                );
+              },
+              icon: const Icon(Icons.sign_language, size: 50),
+              label: const Text('Señas', style: TextStyle(fontSize: 24)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.deepPurple,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
                 ),
-              ),const SizedBox(height: 30),
+              ),
+            ),
+            const SizedBox(height: 30),
             ElevatedButton.icon(
               onPressed: (){
                 Navigator.of(context).push(
