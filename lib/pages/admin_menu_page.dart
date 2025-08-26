@@ -1,3 +1,4 @@
+import 'package:appsign/pages/text_search_page.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:appsign/pages/home_page.dart';
@@ -69,6 +70,25 @@ class AdminMenuPage extends StatelessWidget {
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
+              ),const SizedBox(height: 30),
+            ElevatedButton.icon(
+              onPressed: (){
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder:(context)=> const TextSearchPage()),
+                );
+
+                //Nae
+              },
+              icon: const Icon(Icons.text_fields, size: 50),
+              label: const Text('Texto', style: TextStyle(fontSize: 24)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.deepPurple,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
               ),
               const SizedBox(height: 30),
 
@@ -134,6 +154,9 @@ class AdminMenuPage extends StatelessWidget {
                   ),
                 ),
               ),
+
+
+               
             ],
           ),
         ),
