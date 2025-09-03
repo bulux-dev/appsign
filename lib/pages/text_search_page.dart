@@ -43,7 +43,7 @@ class _TextSearchPageState extends State<TextSearchPage> {
       }
 
       final querySnapshot = await _firestore.collection('content').get();
-      List<Map<String, dynamic>> allContent = querySnapshot.docs.map((doc) => doc.data() as Map<String, dynamic>).toList();
+      List<Map<String, dynamic>> allContent = querySnapshot.docs.map((doc) => doc.data()).toList();
 
       List<Map<String, dynamic>> results = [];
 
@@ -107,6 +107,7 @@ class _TextSearchPageState extends State<TextSearchPage> {
       itemCount: _foundContent.length,
       itemBuilder: (context, index) {
         final content = _foundContent[index];
+        ///ignore: unused_local_variable
         final String mediaUrl = content['url_media'] ?? '';
         final String thumbnailUrl = content['url_miniatura'] ?? '';
         final String mediaType = content['tipo'] ?? '';

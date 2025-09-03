@@ -103,7 +103,7 @@ class _HomePageState extends State<HomePage> {
           .collection('content')
           .get();
 
-      List<Map<String, dynamic>> allContent = querySnapshot.docs.map((doc) => doc.data() as Map<String, dynamic>).toList();
+      List<Map<String, dynamic>> allContent = querySnapshot.docs.map((doc) => doc.data()).toList();
 
       // P-3: Agregado para depuración: Ver todos los datos que se obtienen de Firestore.
       print('Datos obtenidos de Firestore: ${allContent.length} documentos');
@@ -173,6 +173,7 @@ class _HomePageState extends State<HomePage> {
       itemCount: _foundContent.length,
       itemBuilder: (context, index) {
         final content = _foundContent[index];
+        //ignore: unused_local_variable
         final String mediaUrl = content['url_media'] ?? '';
         final String thumbnailUrl = content['url_miniatura'] ?? '';
         final String mediaType = content['tipo'] ?? '';
