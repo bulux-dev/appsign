@@ -1,10 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
-import 'package:tflite_flutter/tflite_flutter.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:flutter/services.dart';
 
-// Este widget con estado gestionará la cámara y la detección
 class SignDetectionModule extends StatefulWidget {
   const SignDetectionModule({super.key});
 
@@ -13,196 +10,113 @@ class SignDetectionModule extends StatefulWidget {
 }
 
 class _SignDetectionModuleState extends State<SignDetectionModule> {
-  // Controlador de la cámara
   CameraController? _cameraController;
-  // Intérprete para el modelo TFLite
-  Interpreter? _interpreter;
-  // Etiquetas del modelo
-  List<String> _labels = [];
-  // Variable para almacenar el signo detectado
-  String _detectedSign = '';
-  // Bandera para evitar múltiples ejecuciones de detección
-  bool _isDetecting = false;
+  late List<CameraDescription> _cameras;
+  bool _isCameraInitialized = false;
+  String _statusMessage = "Iniciando la cámara...";
 
   @override
   void initState() {
     super.initState();
-    _initializeCameraAndModel();
+    // Inicia el proceso de configuración de la cámara al iniciar el widget.
+    _initializeCamera();
   }
 
-  // Inicializa la cámara y carga el modelo TFLite
-  Future<void> _initializeCameraAndModel() async {
-    // 1. Solicitar permisos de cámara
-    if (await Permission.camera.request().isDenied) {
-      // Manejar el caso si el usuario deniega el permiso
-      if (mounted) {
-        // En un entorno de producción, aquí se mostraría un diálogo al usuario.
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Permiso de cámara denegado')),
-        );
-      }
-      return;
-    }
+  Future<void> _initializeCamera() async {
+    // 1. Solicita permiso de acceso a la cámara.
+    final status = await Permission.camera.request();
 
-    // 2. Cargar el modelo TFLite y las etiquetas
-    try {
-      _interpreter = await Interpreter.fromAsset('assets/sign_model.tflite');
-      _labels = await _loadLabels('assets/labels.txt');
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al cargar el modelo o las etiquetas: $e')),
-        );
-      }
-      return;
-    }
-
-    // 3. Inicializar la cámara
-    final cameras = await availableCameras();
-    if (cameras.isEmpty) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No se encontraron cámaras disponibles')),
-        );
-      }
-      return;
-    }
-
-    _cameraController = CameraController(
-      cameras.first,
-      ResolutionPreset.low,
-      enableAudio: false,
-    );
-
-    await _cameraController!.initialize().then((_) {
-      if (!mounted) {
-        return;
-      }
-      setState(() {});
-
-      // 4. Comenzar a procesar el stream de la cámara
-      _cameraController!.startImageStream((CameraImage image) {
-        if (!_isDetecting) {
-          _isDetecting = true;
-          _detectSign(image);
-        }
-      });
-    }).catchError((Object e) {
-      if (e is CameraException) {
-        // Manejar errores de la cámara
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error de cámara: ${e.description}')),
+    if (status.isGranted) {
+      // 2. Si el permiso es concedido, busca las cámaras disponibles en el dispositivo.
+      try {
+        _cameras = await availableCameras();
+        if (_cameras.isNotEmpty) {
+          // 3. Selecciona la primera cámara de la lista y la inicializa.
+          _cameraController = CameraController(
+            _cameras.first,
+            ResolutionPreset.high,
+            imageFormatGroup: ImageFormatGroup.yuv420,
           );
+
+          await _cameraController!.initialize();
+
+          // 4. Muestra la vista previa de la cámara y empieza a procesar los cuadros de video.
+          if (!mounted) {
+            return;
+          }
+          setState(() {
+            _isCameraInitialized = true;
+          });
+
+          // Inicia el "stream" de imágenes. Aquí pasarás cada cuadro a tu modelo de ML.
+          _cameraController!.startImageStream((CameraImage image) {
+            // AQUI ES DONDE VA LA LÓGICA DE DETECCIÓN DE SEÑAS CON UN MODELO DE ML
+            // Por ejemplo:
+            // final recognizedSign = YourMLModel.detectSign(image);
+            // setState(() {
+            //   _statusMessage = recognizedSign;
+            // });
+          });
         }
+      } on CameraException catch (e) {
+        // Maneja errores de la cámara.
+        print("Error al inicializar la cámara: $e");
+        setState(() {
+          _statusMessage = "Error al inicializar la cámara.";
+        });
       }
-    });
-  }
-
-  // Carga las etiquetas del archivo assets
-  Future<List<String>> _loadLabels(String path) async {
-    final file = await rootBundle.loadString(path);
-    return file.split('\n').map((label) => label.trim()).where((label) => label.isNotEmpty).toList();
-  }
-
-  // Convierte la imagen de la cámara y la procesa con el modelo
-  void _detectSign(CameraImage image) {
-    if (_interpreter == null || _labels.isEmpty) {
-      _isDetecting = false;
-      return;
-    }
-
-    // Prepara la entrada del modelo
-    // NOTA: Esta es una simplificación. La conversión de CameraImage (formato YUV) a
-    // un tensor [1, 100, 100, 3] para el modelo es un proceso complejo que
-    // a menudo requiere paquetes adicionales o lógica nativa. Aquí se asume
-    // una lógica de conversión simple para demostrar el flujo.
-    var input = _preprocessImage(image);
-    var output = List.filled(1 * _labels.length, 0).reshape([1, _labels.length]);
-
-    // Ejecuta la inferencia
-    _interpreter!.run(input, output);
-
-    // Procesa el resultado para encontrar la predicción con mayor probabilidad
-    var probabilities = output[0];
-    var maxProb = 0.0;
-    var predictedIndex = -1;
-    for (int i = 0; i < probabilities.length; i++) {
-      if (probabilities[i] > maxProb) {
-        maxProb = probabilities[i];
-        predictedIndex = i;
-      }
-    }
-
-    // Actualiza el estado con el signo detectado
-    if (mounted) {
+    } else {
+      // Si el permiso es denegado, muestra un mensaje.
       setState(() {
-        _detectedSign = (predictedIndex != -1 && maxProb > 0.5)
-            ? _labels[predictedIndex]
-            : 'Esperando...';
+        _statusMessage = "Permiso de cámara denegado.";
       });
     }
-
-    _isDetecting = false;
-  }
-
-  // Función dummy para el preprocesamiento de la imagen
-  // En un caso real, esto convertiría el formato de la cámara (YUV)
-  // al formato de entrada del modelo (RGB, tensor, etc.)
-  List<Object> _preprocessImage(CameraImage image) {
-    // Aquí iría la lógica real de conversión.
-    // Se recomienda usar un paquete como 'image' para este proceso.
-    return [
-      List.filled(100 * 100 * 3, 0.0) // Dummy data
-    ];
   }
 
   @override
   void dispose() {
+    // Asegúrate de detener el controlador de la cámara cuando el widget se destruya.
     _cameraController?.dispose();
-    _interpreter?.close();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_cameraController == null || !_cameraController!.value.isInitialized) {
-      return const Center(child: CircularProgressIndicator());
+    if (!_isCameraInitialized) {
+      // Muestra un indicador de carga mientras la cámara se inicializa.
+      return Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const CircularProgressIndicator(),
+              const SizedBox(height: 20),
+              Text(_statusMessage),
+            ],
+          ),
+        ),
+      );
     }
 
+    // Muestra la vista de la cámara.
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Detección de Señas'),
-        centerTitle: true,
-      ),
       body: Stack(
         children: [
-          // Vista previa de la cámara
-          Positioned.fill(
-            child: AspectRatio(
-              aspectRatio: _cameraController!.value.aspectRatio,
-              child: CameraPreview(_cameraController!),
-            ),
+          SizedBox(
+            width: double.infinity,
+            height: double.infinity,
+            child: CameraPreview(_cameraController!),
           ),
-          // Cuadro para mostrar el texto de la detección
           Align(
             alignment: Alignment.bottomCenter,
-            child: Padding(
-              padding: const EdgeInsets.all(20.0),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                decoration: BoxDecoration(
-                  color: Colors.white70,
-                  borderRadius: BorderRadius.circular(15),
-                ),
-                child: Text(
-                  _detectedSign,
-                  style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black,
-                  ),
-                ),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              color: Colors.black54,
+              width: double.infinity,
+              child: Text(
+                _statusMessage,
+                style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
               ),
             ),
           ),
