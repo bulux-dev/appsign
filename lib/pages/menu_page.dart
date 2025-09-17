@@ -54,7 +54,7 @@ class MenuPage extends StatelessWidget {
               onPressed: () {
                 // Navegar a la página de "Señas"
                 Navigator.of(context).push(
-                 MaterialPageRoute(builder: (context) => const SignDetectionModule()),
+                 MaterialPageRoute(builder: (context) => const PoseDetectionModule()),
                 );
               },
               icon: const Icon(Icons.sign_language, size: 50),
