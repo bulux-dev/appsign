@@ -1,149 +1,149 @@
-import 'dart:typed_data';
-import 'dart:convert';
+// import 'package:flutter/material.dart';
+// import 'package:camera/camera.dart';
+// import 'package:permission_handler/permission_handler.dart';
+
+// // Este es solo un esqueleto. La lógica para el modelo de ML va aquí.
+// // Necesitarías importar paquetes como tflite_flutter para cargar y ejecutar el modelo.
+// // import 'package:tflite_flutter/tflite_flutter.dart';
+
+// class SignDetectionModule extends StatefulWidget {
+//   const SignDetectionModule({super.key});
+
+//   @override
+//   State<SignDetectionModule> createState() => _SignDetectionModuleState();
+// }
+
+// class _SignDetectionModuleState extends State<SignDetectionModule> {
+//   CameraController? _cameraController;
+//   late List<CameraDescription> _cameras;
+//   bool _isCameraInitialized = false;
+//   String _recognizedText = "Iniciando reconocimiento...";
+
+//   @override
+//   void initState() {
+//     super.initState();
+//     _requestPermissionsAndInitializeCamera();
+//   }
+
+//   // Solicita permisos y configura la cámara
+//   Future<void> _requestPermissionsAndInitializeCamera() async {
+//     final status = await Permission.camera.request();
+//     if (status.isGranted) {
+//       _cameras = await availableCameras();
+//       if (_cameras.isNotEmpty) {
+//         _cameraController = CameraController(
+//           _cameras.first,
+//           ResolutionPreset.high,
+//           imageFormatGroup: ImageFormatGroup.yuv420,
+//         );
+
+//         _cameraController!.initialize().then((_) {
+//           if (!mounted) {
+//             return;
+//           }
+//           setState(() {
+//             _isCameraInitialized = true;
+//           });
+
+//           // Inicia el procesamiento de cuadros de video aquí
+//           _cameraController!.startImageStream((CameraImage image) {
+//             // AQUI ES DONDE PASAS CADA IMAGEN AL MODELO DE MACHINE LEARNING
+//             // Por ejemplo:
+//             // final result = _processImageWithMLModel(image);
+//             // setState(() {
+//             //   _recognizedText = result;
+//             // });
+//             //
+//             // Esta lógica no está implementada en este código
+//           });
+//         });
+//       }
+//     } else {
+//       setState(() {
+//         _recognizedText = "Permiso de cámara denegado.";
+//       });
+//     }
+//   }
+
+//   @override
+//   void dispose() {
+//     _cameraController?.dispose();
+//     super.dispose();
+//   }
+
+//   @override
+//   Widget build(BuildContext context) {
+//     if (!_isCameraInitialized) {
+//       return const Center(child: CircularProgressIndicator());
+//     }
+
+//     return Scaffold(
+//       body: Stack(
+//         children: [
+//           // Muestra el flujo de video de la cámara
+//           Center(
+//             child: CameraPreview(_cameraController!),
+//           ),
+//           // Muestra el texto reconocido en la parte inferior
+//           Align(
+//             alignment: Alignment.bottomCenter,
+//             child: Container(
+//               padding: const EdgeInsets.all(16),
+//               color: Colors.black54,
+//               child: Text(
+//                 _recognizedText,
+//                 style: const TextStyle(
+//                   color: Colors.white,
+//                   fontSize: 24,
+//                   fontWeight: FontWeight.bold,
+//                 ),
+//                 textAlign: TextAlign.center,
+//               ),
+//             ),
+//           ),
+//         ],
+//       ),
+//     );
+//   }
+// }
+
+
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
-import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
-import 'package:http/http.dart' as http;
+import 'package:permission_handler/permission_handler.dart';
 
-class PoseDetectionModule extends StatefulWidget {
-  const PoseDetectionModule({super.key});
+// Este es solo un esqueleto. La lógica para el modelo de ML va aquí.
+// Necesitarías importar paquetes como tflite_flutter para cargar y ejecutar el modelo.
+// import 'package:tflite_flutter/tflite_flutter.dart';
+
+class SignDetectionModule extends StatefulWidget {
+  const SignDetectionModule({super.key});
 
   @override
-  State<PoseDetectionModule> createState() => _PoseDetectionModuleState();
+  State<SignDetectionModule> createState() => _SignDetectionModuleState();
 }
 
-class _PoseDetectionModuleState extends State<PoseDetectionModule> {
-  CameraController? _cameraController;
-  late PoseDetector _poseDetector;
-  bool _isDetecting = false;
-  List<CameraDescription> cameras = [];
-  int _currentCameraIndex = 0;
+class _SignDetectionModuleState extends State<SignDetectionModule> {
 
   @override
   void initState() {
     super.initState();
-    _initialize();
   }
+
 
   @override
   void dispose() {
-    _cameraController?.dispose();
-    _poseDetector.close();
     super.dispose();
-  }
-
-  Future<void> _initialize() async {
-    cameras = await availableCameras();
-    _poseDetector = PoseDetector(
-      options: PoseDetectorOptions(
-        mode: PoseDetectionMode.stream,
-      ),
-    );
-    _startCamera(cameras[_currentCameraIndex]);
-  }
-
-  void _startCamera(CameraDescription camera) async {
-    _cameraController = CameraController(
-      camera,
-      ResolutionPreset.medium,
-      enableAudio: false,
-    );
-    await _cameraController!.initialize();
-
-    _cameraController!.startImageStream((CameraImage image) {
-      if (!_isDetecting) {
-        _isDetecting = true;
-        _processCameraImage(image).whenComplete(() => _isDetecting = false);
-      }
-    });
-
-    setState(() {});
-  }
-
-  void _switchCamera() {
-    _currentCameraIndex = (_currentCameraIndex + 1) % cameras.length;
-    _cameraController?.stopImageStream();
-    _cameraController?.dispose();
-    _startCamera(cameras[_currentCameraIndex]);
-  }
-
-  Future<void> _processCameraImage(CameraImage image) async {
-    try {
-      final inputImage = InputImage.fromBytes(
-        bytes: _concatenatePlanes(image.planes),
-        inputImageData: InputImageData(
-          size: Size(image.width.toDouble(), image.height.toDouble()),
-          imageRotation: _cameraController!.description.sensorOrientation == 90
-              ? InputImageRotation.rotation90deg
-              : InputImageRotation.rotation0deg,
-          inputImageFormat: InputImageFormat.yuv420,
-          planeData: image.planes.map((plane) {
-            return InputImagePlaneMetadata(
-              bytesPerRow: plane.bytesPerRow,
-              height: plane.height,
-              width: plane.width,
-            );
-          }).toList(),
-        ),
-      );
-
-      final poses = await _poseDetector.processImage(inputImage);
-
-      if (poses.isNotEmpty) {
-        final keypoints = poses.first.landmarks.values
-            .map((lm) => [lm.x, lm.y, lm.z])
-            .expand((e) => e)
-            .toList();
-
-        await _sendKeypoints(keypoints);
-      }
-    } catch (e) {
-      print("Error procesando imagen: $e");
-    }
-  }
-
-  Uint8List _concatenatePlanes(List<Plane> planes) {
-    return Uint8List.fromList(planes.map((p) => p.bytes).expand((x) => x).toList());
-  }
-
-  Future<void> _sendKeypoints(List<double> keypoints) async {
-    try {
-      final response = await http.post(
-        Uri.parse("http://178.128.181.235/predict"),
-        headers: {"Content-Type": "application/json"},
-        body: jsonEncode({"keypoints": keypoints}),
-      );
-
-      if (response.statusCode != 200) {
-        print("Error al enviar keypoints: ${response.body}");
-      } else {
-        print("Keypoints enviados correctamente: ${response.body}");
-      }
-    } catch (e) {
-      print("Error de conexión al enviar keypoints: $e");
-    }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_cameraController == null || !_cameraController!.value.isInitialized) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    return Scaffold(
-      appBar: AppBar(title: const Text("Pose Detection Module")),
-      body: Stack(
-        children: [
-          CameraPreview(_cameraController!),
-          Positioned(
-            bottom: 30,
-            left: 20,
-            child: ElevatedButton(
-              onPressed: _switchCamera,
-              child: const Text("Cambiar Cámara"),
-            ),
-          ),
-        ],
+    return const Scaffold(
+      body: Center(
+        child: Text(
+          "¡Aquí va la magia!",
+          style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+        ),
       ),
     );
   }
