@@ -4,55 +4,6 @@ import 'package:camera/camera.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:http/http.dart' as http;
 
-// Este es el único archivo para el módulo de detección de señas.
-// El resto de la lógica de la aplicación puede llamar a este widget.
-
-// NOTA: Para que este código funcione, debes agregar la dependencia 'http'
-// a tu archivo pubspec.yaml:
-// dependencies:
-//   flutter:
-//     sdk: flutter
-//   camera: ^0.10.5+9
-//   permission_handler: ^10.4.5
-//   http: ^1.1.0
-
-/// Simula la comunicación con un servicio de API externo.
-/// En un proyecto real, esta clase estaría en su propio archivo,
-/// pero la incluimos aquí para mantener todo en un solo lugar.
-class ApiService {
-  final String _apiEndpoint = "http://localhost:5000/predict"; // Reemplaza con la URL de tu API
-  
-  // Envía un frame de la cámara a la API para su procesamiento.
-  Future<String> sendFrameToApi(CameraImage image) async {
-    try {
-      // Convierte los datos de la imagen a un formato que la API pueda entender (por ejemplo, JPEG).
-      // Aquí estamos simulando el proceso, en la práctica necesitarías un convertidor
-      // de CameraImage a un formato de imagen real.
-      final Uint8List fakeImageData = Uint8List(100);
-
-      final response = await http.post(
-        Uri.parse(_apiEndpoint),
-        headers: <String, String>{
-          'Content-Type': 'application/json; charset=UTF-8',
-        },
-        body: fakeImageData, // Enviar los datos de la imagen aquí
-      );
-
-      if (response.statusCode == 200) {
-        // La llamada fue exitosa.
-        return response.body; // Retorna la predicción de la API
-      } else {
-        // La llamada falló, maneja el error.
-        print('Error en la API: ${response.statusCode}');
-        return "Error en la API";
-      }
-    } catch (e) {
-      // Ocurrió un error de red, como no poder conectar al servidor.
-      print('Excepción al enviar frame: $e');
-      return "Sin conexión con el servidor";
-    }
-  }
-}
 
 class SignDetectionModule extends StatefulWidget {
   const SignDetectionModule({super.key});
@@ -67,7 +18,6 @@ class _SignDetectionModuleState extends State<SignDetectionModule> {
   int _selectedCameraIndex = 0;
   bool _isCameraInitialized = false;
   String _statusMessage = "Iniciando la cámara...";
-  final ApiService _apiService = ApiService();
 
   @override
   void initState() {
@@ -114,10 +64,7 @@ class _SignDetectionModuleState extends State<SignDetectionModule> {
 
       // Inicia el "stream" de imágenes para el módulo de detección
       _cameraController!.startImageStream((CameraImage image) async {
-        // Envía el frame a la API y actualiza el estado con la predicción
-        final prediction = await _apiService.sendFrameToApi(image);
         setState(() {
-          _statusMessage = prediction;
         });
       });
     } on CameraException catch (e) {
@@ -150,8 +97,7 @@ class _SignDetectionModuleState extends State<SignDetectionModule> {
     _cameraController?.dispose();
     super.dispose();
   }
-
-  @override
+@override
   Widget build(BuildContext context) {
     if (!_isCameraInitialized) {
       return Scaffold(
@@ -171,13 +117,18 @@ class _SignDetectionModuleState extends State<SignDetectionModule> {
     return Scaffold(
       body: Stack(
         children: [
-          // Muestra la vista de la cámara en pantalla completa
+          // Muestra la vista de la cámara en pantalla completa, ajustada para no estirarse.
+          // Aquí está la corrección:
           SizedBox(
             width: double.infinity,
             height: double.infinity,
-            child: AspectRatio(
-              aspectRatio: _cameraController!.value.aspectRatio,
-              child: CameraPreview(_cameraController!),
+            child: FittedBox(
+              fit: BoxFit.cover,
+              child: SizedBox(
+                width: _cameraController!.value.previewSize!.height,
+                height: _cameraController!.value.previewSize!.width,
+                child: CameraPreview(_cameraController!),
+              ),
             ),
           ),
           
@@ -215,4 +166,5 @@ class _SignDetectionModuleState extends State<SignDetectionModule> {
       ),
     );
   }
+  
 }
